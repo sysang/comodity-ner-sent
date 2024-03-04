@@ -1,0 +1,6 @@
+.ipynb_checkpoints/
+mydata/
+output_trainer/
+ner/output
+sentiment_analysis_spacy/output
+
