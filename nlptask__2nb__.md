@@ -14,10 +14,24 @@ jupyter:
     name: python3
 ---
 
+## Install required packages
+
 ```python
 #!pip3 install -U spacy
-#!python -m spacy download en_core_web_md
+#!python -m spacy download en_core_web_sm
+
+# !pip3 install -U 'transformers[torch]'
+# !pip install -U optimum
+# !pip3 install -U dataset
+# !pip3 install -U evaluate
+
+# !pip3 install -U numpy
+# !pip install -U scikit-learn
 ```
+
+## Prepare training data for Spacy NER
+The data is annotated using [Label Studio](https://labelstud.io/), includes the first 232 items in sample.txt  
+Data is transformed to Spacy format, saved to "./ner/train.spacy"
 
 ```python
 import json
@@ -25,7 +39,10 @@ import json
 with open('ner/ner_train.json', mode='r', encoding='utf-8') as fd:
     ner_train_data = json.loads(fd.read());
 
-print(ner_train_data[0])
+print('Number of samples: ', len(ner_train_data))
+```
+
+```python
 print(ner_train_data[5])
 ```
 
@@ -95,45 +112,20 @@ for item in ner_train_data:
 
 db.to_disk("./ner/train.spacy")
 ```
-```python
-text = "Gold Rate Today, 30 April 2021: Gold, Silver fall, know – what are the 10 grams gold rate today https://t.co/kSVOTVuXw5"
+## Prepare training data for Spacy TextCategorizer
+The data is annotated using Label Studio, includes 45 out of the first 232 items in sample.txt  
+Data is transformed to Spacy format, saved to "./sentiment_analysis_spacy/train.spacy"  
 
-```
-
-```python
-doc = nlp(text)
-for ent in doc.ents:
-    print(ent.text, ent.start_char, ent.end_char, ent.label_)
-```
-
-```python
-text = "Tbvh, Adekunle Gold really did magic on this song he issued out titled #IIWII .. Man always stepping up his game.. https://t.co/LEDEq0AdF6"
-doc = nlp(text)
-for ent in doc.ents:
-    print(ent.text, ent.start_char, ent.end_char, ent.label_)
-```
-
-```python
-text = "Did and Dig!. Gold is one of the most desired and useful metals in the world. Not only could it be beautifully shaped and sculpted, the precious yellow metal conducts electricity and does not tarnish. This article could possibly give you more knowledge about the uses of the precious metal gold. Check it here!   These qualities could make it the metal of choice for the industrial, medical and technology businesses. Arguably no other metal has been said to have a record throughout history, with almost every established culture using gold to symbolise power, beauty, purity and accomplishment.    Today, gold still seems to occupy an important place important place in our culture and society people could posibly use it to make our one of the most prized objects: wedding rings, Olympic medals, money, jewellery, Oscars, Grammys, crucifixes, art and many more. This is a sponsored post. Check disclaimer on profile and landing page"
-doc = nlp(text)
-for ent in doc.ents:
-    print(ent.text, ent.start_char, ent.end_char, ent.label_)
-```
-
-```python
-text = "Gold Forecast: Hovering Between Moving Averages. Pay close attention to the rate of change in the yield of bonds, because if it is a slow and gradual rise, then I believe that gold should do fairly well. Gold markets initially tried to rally during the course of the trading session on Thursday but failed to continue going higher at the 200 day EMA as it continues to be quite resistive. At this point, the market then felt to reach down below the 50 day EMA, which of course was a very negative sign. However, by the end of the session we turned around to break above the 50 day EMA and now it looks like the market is essentially doing the same thing it has been doing for several days. These are two major averages that a lot of people pay attention to, so it should not be overly surprising that we are stuck in this general vicinity. Furthermore, you have to pay close attention to the US dollar, because the gold market is highly influenced by it. Now that that we have broken down below the 50 day EMA, it looks like the market is finding value hunters underneath just above the $1750 level. I think what we are looking at here is a market that is trying to figure out where we are getting ready to go longer term. When you look at the charts you can see that we have formed a double bottom just below the $1700 level, so I think if we break down below the $1750 level, then we will go testing that area. However, the $1750 level above had been resisted previously, broken out above, and now has been retested. At this point, we have to question whether or not this attempt to form a basing pattern has started to stick? A break above the $1800 level opens up the possibility of a much bigger move, and therefore I think that is the key for buying this market. Until then, I would be hesitant to put a lot of money into the gold market, but it certainly looks as if we are trying to turn things around. It could be very noisy over the next couple of weeks, but I do have my eye on this market as a confirmation of the return could very well send this market looking towards the highs again. Pay close attention to the rate of change in the yield of bonds, because if it is a slow and gradual rise, then I believe that gold should do fairly well"
-doc = nlp(text)
-for ent in doc.ents:
-    print(ent.text, ent.start_char, ent.end_char, ent.label_)
-```
 ```python
 import json
 
 with open('sentiment_analysis_spacy/sentiment_train.json', mode='r', encoding='utf-8') as fd:
     sent_train_data = json.loads(fd.read());
-
+```
+```python
 print(sent_train_data[5])
 ```
+
 ```python
 from pathlib import Path
 import spacy
@@ -141,9 +133,9 @@ from spacy.tokens import DocBin
 
 def read_categories():
     return Path('sentiment_analysis_spacy/categories.txt').open().read().strip().split("\n")
-
 categories = read_categories();
-print(categories)
+print('categories: ', categories)
+
 nlp = spacy.blank("en")
 db = DocBin()
 for item in sent_train_data:
@@ -163,45 +155,76 @@ for item in sent_train_data:
     # True labels get value 1
     doc.cats[label] = 1
 
-    print(doc)
     db.add(doc)
+
+print('Number of samples: ', len(db))
 
 db.to_disk("./sentiment_analysis_spacy/train.spacy")
 ```
 
+## Train Spacy NER model
+The training set up is placed at directory './ner', two important files are config.cfg and train.spacy.  
+Note: To avoid spending too much time in annotation, training data also is used as validation data. In actual practice validation data must differ from training data to evaluate model's generisation.  
+Trained model is stored in "./ner/output" for later use.
+
 ```python
-# number of row has been used for training
+!python3 -m spacy train ner/config.cfg --output ./ner/output --paths.train ./ner/train.spacy --paths.dev ./ner/train.spacy
+```
+
+## Train Spacy TextCategorizer model
+The training set up is placed at directory './sentiment_analysis_spacy', two important files are config.cfg and train.spacy.  
+Note: To avoid spending too much time in annotation, training data also is used as validation data. In actual practice validation data must differ from training data to evaluate model's generisation.  
+Trained model is stored in "./sentiment_analysis_spacy/output" for later use.
+
+```python
+!python3 -m spacy train sentiment_analysis_spacy/config.cfg --output ./sentiment_analysis_spacy/output --paths.train ./sentiment_analysis_spacy/train.spacy --paths.dev ./sentiment_analysis_spacy/train.spacy
+```
+
+## Evaluate Sentiment Analysis on gold and silver commodities related content
+Two models are used to recognise sentiment, the results are then compared against each other.  
+One model is Spacy model, another is [FinancialBERT](https://huggingface.co/ahmedrachid/FinancialBERT-Sentiment-Analysis) model from Huggingface  
+Note: one disadvantage of FinancialBERT model is that it can not process text that has more than 512 tokens.
+
+```python
+# to exclude first 232 rows that have been used for training
 padding = 231
+
 with open('sample.txt', mode='r', encoding='utf-8') as fd:
     samples = fd.readlines()
 samples = samples[padding:]
 ```
 
+#### Load Spacy model
+
 ```python
 import spacy
 ner = spacy.load("ner/output/model-last")
-# for doc in nlp.pipe(texts, disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"]):
-#   print([(ent.text, ent.label_) for ent in doc.ents])
 ```
+
+#### Load Huggingface model
 
 ```python
 from transformers import BertTokenizer, BertForSequenceClassification
 from transformers import pipeline
 from datasets import Dataset, DatasetDict
 
-model = BertForSequenceClassification.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis",num_labels=3)
+pretrainedFinancialBERT = BertForSequenceClassification.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis",num_labels=3)
+pretrainedFinancialBERT.to_bettertransformer()
 tokenizer = BertTokenizer.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis")
 
-bert_sent = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+bert_sent = pipeline("sentiment-analysis", model=pretrainedFinancialBERT, tokenizer=tokenizer)
 
 sentences = ["Operating profit rose to EUR 13.1 mn from EUR 8.7 mn in the corresponding period in 2007 representing 7.7 % of net sales.",  
              "Bids or offers include at least 1,000 shares and the value of the shares must correspond to at least EUR 4,000.", 
              "Raute reported a loss per share of EUR 0.86 for the first half of 2009 , against EPS of EUR 0.74 in the corresponding period of 2008.", 
              ]
 
-#results = bert_sent(sentences)
-#print(results)
+results = bert_sent(sentences)
+print(results)
 ```
+
+#### Filter gold and silver commodities related content
+Use Spacy model that has been trained before to perform NER
 
 ```python
 gold_silver_com_sample = []
@@ -215,12 +238,13 @@ for sample in samples:
             gold_silver_com_sample.append(sample);
 ```
 
+#### Evaluate and collect data
+
 ```python
 import spacy
 sent = spacy.load("sentiment_analysis_spacy/output/model-last")
 
 text_length = 1000
-headers = ['Sample', 'label by Spacy', 'label by FinancialBERT', 'Comparison']
 data = []
 for sample in gold_silver_com_sample:
 
@@ -232,7 +256,7 @@ for sample in gold_silver_com_sample:
     if len(sample.split()) < 320:
         bert_predicted = bert_sent(sample)
         bert_label = bert_predicted[0]['label'].lower()
-        unmatched = 'X' if spacy_label != bert_label else ''
+        unmatched = 'X' if spacy_label != bert_label else 'O'
     else:
         bert_label = 'n/a'
         unmatched = ''
@@ -241,40 +265,47 @@ for sample in gold_silver_com_sample:
     data.append([sample[:text_length], spacy_label, bert_label, unmatched])
 ```
 
+#### Display data
+
 ```python
 # !pip3 install -U tabulate
 import tabulate
+
+headers = ['Sample', 'Spacy', 'FinancialBERT', 'Comparison']
 table = tabulate.tabulate(
     data,
     headers=headers,
     tablefmt='simple',
-    colalign=('center', 'left','center', 'center'),
-    maxcolwidths=[4, 65, 8, 8], showindex="always"
+    colalign=('center', 'left','center', 'center', 'center'),
+    maxcolwidths=[4, 60, 8, 8, 8], showindex="always"
     )
 print(table)
 ```
 
-```python
-# !pip3 install -U 'transformers[torch]'
-# !pip3 install -U dataset
-# !pip3 install -U numpy
-# !pip3 install -U evaluate
-# !pip install -U scikit-learn
-```
+## Fine tune FinancialBERT using the same training data that is used for training Spacy TextCategorizer
+In model overview we see that FinancialBERT include bert layer, classifier layer. The fine tuning experiment is trying to train classifier layer only, bert layer is kept unchanged during training in order to preserve pretrained performance.
 
 ```python
-model
-```
+from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import pipeline
+from datasets import Dataset, DatasetDict
 
-```python
+model = BertForSequenceClassification.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis",num_labels=3)
+tokenizer = BertTokenizer.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis")
+print('Model summarization: \n\n', model)
+
 for param in model.bert.embeddings.parameters():
   param.requires_grad = False
-```
 
-```python
 for param in model.bert.encoder.parameters():
   param.requires_grad = False
+
+for param in model.bert.pooler.parameters():
+  param.requires_grad = False
+
 ```
+
+#### Prepare training data
 
 ```python
 from pathlib import Path
@@ -301,7 +332,7 @@ for item in sent_train_data:
         'label': label2id[label]
         })
 
-print(len(dataset))
+print('number of sample: ', len(dataset))
 print(dataset[3])
 
 ```
@@ -313,6 +344,9 @@ def tokenize_function(examples):
 dataset = Dataset.from_list(dataset)
 tokenized_datasets = dataset.map(tokenize_function, batched=True)
 ```
+#### Training (fine tuning) 
+Note: traing_dataset and eval_datasset are the same.
+
 ```python
 from transformers import TrainingArguments, Trainer
 import numpy as np
@@ -329,7 +363,7 @@ def compute_metrics(eval_pred):
 batch_size = 10
 training_args = TrainingArguments(
   output_dir="output_trainer",
-  num_train_epochs=20,
+  num_train_epochs=120,
   per_device_train_batch_size=batch_size,
   per_device_eval_batch_size=batch_size,
   evaluation_strategy="epoch",
@@ -351,5 +385,74 @@ trainer.train()
 ```
 
 ```python
+model.save_pretrained('models/FinancialBERT')
+```
 
+## Perform Spacy model, FinancialBERT model, fine tuned FinancialBERT model
+
+
+#### Evaluate and colllect data
+
+```python
+import spacy
+from transformers import BertTokenizer, BertForSequenceClassification
+from transformers import pipeline
+from datasets import Dataset, DatasetDict
+
+# Load Spacy model
+sent = spacy.load("sentiment_analysis_spacy/output/model-last")
+
+# Load FinancialBERT
+tokenizer = BertTokenizer.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis")
+
+# Load fine tuned model
+pretrainedFinancialBERT = BertForSequenceClassification.from_pretrained("ahmedrachid/FinancialBERT-Sentiment-Analysis",num_labels=3)
+pretrainedFinancialBERT.to_bettertransformer()
+bert_sent1 = pipeline("sentiment-analysis", model=pretrainedFinancialBERT, tokenizer=tokenizer)
+
+tunedFinancialBERT = BertForSequenceClassification.from_pretrained('models/FinancialBERT')
+tunedFinancialBERT.to_bettertransformer()
+bert_sent2 = pipeline("sentiment-analysis", model=tunedFinancialBERT, tokenizer=tokenizer)
+
+text_length = 1000
+data2 = []
+for sample in gold_silver_com_sample:
+
+    doc = sent(sample)
+    spacy_label = max(doc.cats.items(), key=lambda x: x[1])[0]
+    spacy_label = spacy_label.lower()
+
+    # model's max_seq_length is 512, FinancialBERT is not able to process too long documents
+    if len(sample.split()) < 320:
+        bert_predicted1 = bert_sent1(sample)
+        bert_label1 = bert_predicted1[0]['label'].lower()
+        unmatched1 = 'X' if spacy_label != bert_label1 else 'O'
+
+        bert_predicted2 = bert_sent2(sample)
+        bert_label2 = bert_predicted2[0]['label'].lower()
+        unmatched2 = 'X' if spacy_label != bert_label2 else 'O'
+    else:
+        bert_label = 'n/a'
+        unmatched = ''
+
+
+    data2.append([sample[:text_length], spacy_label, bert_label1, unmatched1, bert_label2, unmatched2])
+```
+
+#### Display data
+Manually checking some samples that fine tuned model predicts differently from origin one, found that funed one is slightly better.
+
+```python
+# !pip3 install -U tabulate
+import tabulate
+
+headers = ['Sample', 'Spacy', 'FinancialBERT', 'vs Spacy', 'tuned FinancialBERT', 'vs Spacy']
+table = tabulate.tabulate(
+    data2,
+    headers=headers,
+    tablefmt='simple',
+    colalign=('center', 'left','center', 'center', 'center', 'center', 'center'),
+    maxcolwidths=[4, 50, 8, 8, 8, 8, 8], showindex="always"
+    )
+print(table)
 ```
